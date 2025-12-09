@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useCurrentAccount } from "@mysten/dapp-kit"
+import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TileGrid } from "./tile-grid"
@@ -10,18 +10,53 @@ import { BetAmount } from "./bet-amount"
 import { LuckyBoxModal } from "./lucky-box-modal"
 import { toast } from "sonner"
 import { Coins, Play, RotateCcw } from "lucide-react"
+import { createPlayGameTransaction } from "@/lib/sui-utils"
+import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
 
 const GAME_DURATION = 60
 const MIN_BET = 0.05
 
 export function GameBoard() {
   const currentAccount = useCurrentAccount()
+  const client = useSuiClient()
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction()
+
   const [selectedTiles, setSelectedTiles] = useState<number[]>([])
   const [betAmount, setBetAmount] = useState(MIN_BET)
   const [isPlaying, setIsPlaying] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState(GAME_DURATION)
   const [showLuckyBox, setShowLuckyBox] = useState(false)
-  const [balance, setBalance] = useState(10)
+  const [balance, setBalance] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    async function fetchBalance() {
+      if (!currentAccount?.address) {
+        setBalance(0)
+        return
+      }
+
+      try {
+        const balances = await client.getAllBalances({
+          owner: currentAccount.address,
+        })
+
+        const suiBalance = balances.find((b) => b.coinType === "0x2::sui::SUI")
+        if (suiBalance) {
+          setBalance(mistToSui(BigInt(suiBalance.totalBalance)))
+        } else {
+          setBalance(0)
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching balance:", error)
+        setBalance(0)
+      }
+    }
+
+    fetchBalance()
+    const interval = setInterval(fetchBalance, 10000)
+    return () => clearInterval(interval)
+  }, [currentAccount, client])
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -50,9 +85,14 @@ export function GameBoard() {
     })
   }
 
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
     if (!currentAccount) {
       toast.error("Please connect your wallet first!")
+      return
+    }
+
+    if (!isContractConfigured()) {
+      toast.error("Smart contract not configured. Please update environment variables.")
       return
     }
 
@@ -66,9 +106,53 @@ export function GameBoard() {
       return
     }
 
-    setIsPlaying(true)
-    setTimeRemaining(GAME_DURATION)
-    toast.success("Game started! Good luck!")
+    if (balance < betAmount) {
+      toast.error(`Insufficient balance. You have ${balance.toFixed(3)} SUI`)
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const tx = createPlayGameTransaction(CONTRACT_CONFIG.GAME_STATE_ID, betAmount, selectedTiles)
+
+      signAndExecuteTransaction(
+        {
+          transaction: tx,
+        },
+        {
+          onSuccess: (result) => {
+            console.log("[v0] Transaction successful:", result.digest)
+            toast.success("Game started! Transaction confirmed", {
+              description: `TX: ${result.digest.slice(0, 8)}...`,
+            })
+            setIsPlaying(true)
+            setTimeRemaining(GAME_DURATION)
+            setIsSubmitting(false)
+
+            setTimeout(() => {
+              client.getAllBalances({ owner: currentAccount.address }).then((balances) => {
+                const suiBalance = balances.find((b) => b.coinType === "0x2::sui::SUI")
+                if (suiBalance) setBalance(mistToSui(BigInt(suiBalance.totalBalance)))
+              })
+            }, 2000)
+          },
+          onError: (error) => {
+            console.error("[v0] Transaction error:", error)
+            toast.error("Transaction failed", {
+              description: error.message || "Please try again",
+            })
+            setIsSubmitting(false)
+          },
+        },
+      )
+    } catch (error: any) {
+      console.error("[v0] Error creating transaction:", error)
+      toast.error("Failed to create transaction", {
+        description: error.message || "Please try again",
+      })
+      setIsSubmitting(false)
+    }
   }
 
   const handleGameEnd = () => {
@@ -132,7 +216,7 @@ export function GameBoard() {
                       <span className="text-muted-foreground">Your Balance:</span>
                       <span className="font-bold flex items-center gap-1">
                         <Coins className="h-4 w-4 text-primary" />
-                        {balance.toFixed(2)} SUI
+                        {balance.toFixed(3)} SUI
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -150,10 +234,10 @@ export function GameBoard() {
                   onClick={handleStartGame}
                   size="lg"
                   className="flex-1 text-lg font-bold bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-                  disabled={!currentAccount || selectedTiles.length === 0}
+                  disabled={!currentAccount || selectedTiles.length === 0 || isSubmitting || !isContractConfigured()}
                 >
                   <Play className="mr-2 h-5 w-5" />
-                  Start Game
+                  {isSubmitting ? "Processing..." : "Start Game"}
                 </Button>
               ) : (
                 <Button
@@ -170,6 +254,11 @@ export function GameBoard() {
 
             {!currentAccount && (
               <p className="text-center text-sm text-muted-foreground">Connect your wallet to start playing</p>
+            )}
+            {currentAccount && !isContractConfigured() && (
+              <p className="text-center text-sm text-yellow-600 dark:text-yellow-400">
+                Contract not configured. Please deploy and update environment variables.
+              </p>
             )}
           </CardContent>
         </Card>
