@@ -2,27 +2,14 @@
 
 import * as React from "react"
 import { X } from "lucide-react"
-import { cn } from "@/lib/utils"
 
-type ToastProps = {
-  title?: string
-  description?: string
-  variant?: "default" | "destructive"
-  onClose?: () => void
-}
-
-export const Toast = ({ title, description, variant = "default", onClose }: ToastProps) => {
+export function Toast({ title, description, onClose }: { title?: string; description?: string; onClose?: () => void }) {
   return (
-    <div className={cn(
-      "fixed bottom-4 right-4 z-50 flex w-96 items-center rounded-lg bg-white p-4 shadow-lg ring-1 ring-black/10",
-      variant === "destructive" && "bg-red-50 ring-red-200"
-    )}>
-      <div className="flex-1">
-        {title && <div className="font-semibold">{title}</div>}
-        {description && <div className="text-sm text-gray-600">{description}</div>}
-      </div>
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg bg-gray-900 px-6 py-4 text-white shadow-xl">
+      {title && <h4 className="font-bold">{title}</h4>}
+      {description && <p className="mt-1 text-sm opacity-90">{description}</p>}
       {onClose && (
-        <button onClick={onClose} className="ml-4 text-gray-500 hover:text-gray-700">
+        <button onClick={onClose} className="absolute right-3 top-3">
           <X className="h-4 w-4" />
         </button>
       )}
