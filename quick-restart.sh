@@ -8,3 +8,4 @@ rm -rf .next .turbo
 
 echo "✅ Starting dev server without Turbopack..."
 npm run dev
+1
