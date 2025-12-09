@@ -1,4 +1,4 @@
 {
-  "buildCommand": "npm install && npm run build",
+  "buildCommand": "npm install --legacy-peer-deps && npm install --save-dev @types/node@24.10.2 @types/react@19.0.7 @types/react-dom@19.0.3 && npm run build",
   "framework": "nextjs"
 }
