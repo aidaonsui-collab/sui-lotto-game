@@ -1,0 +1,11 @@
+Stop your dev server (press Ctrl+C if it's running)
+
+Then run these commands one by one:
+
+rm -rf node_modules
+rm -f package-lock.json
+npm install
+npm run dev
+
+OR just run:
+bash fix-now.sh

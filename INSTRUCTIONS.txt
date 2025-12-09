@@ -1,0 +1,30 @@
+STEP BY STEP INSTRUCTIONS TO FIX YOUR APP:
+
+1. Open Terminal
+
+2. Run this command:
+   chmod +x RUN_THESE_COMMANDS.sh && ./RUN_THESE_COMMANDS.sh
+
+3. Wait for npm install to complete
+
+4. The dev server should start automatically
+
+5. Open http://localhost:3000 in your browser
+
+---
+
+IF YOU STILL GET MODULE ERRORS after step 5:
+
+6. Press Ctrl+C to stop the server
+
+7. Run this command:
+   chmod +x fix-next-config.sh && ./fix-next-config.sh
+
+8. Run this command:
+   npm run dev
+
+9. Open http://localhost:3000 in your browser
+
+---
+
+Your app should now be running!

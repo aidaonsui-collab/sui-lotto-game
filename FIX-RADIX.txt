@@ -1,0 +1,13 @@
+RADIX UI PACKAGES ARE MISSING
+==============================
+
+Run this command to install them:
+
+bash install-radix.sh
+
+OR manually run:
+
+npm install @radix-ui/react-avatar @radix-ui/react-label @radix-ui/react-tabs @radix-ui/react-tooltip @radix-ui/react-slot @radix-ui/react-dialog @radix-ui/react-dropdown-menu --legacy-peer-deps
+
+Then restart dev server:
+npm run dev

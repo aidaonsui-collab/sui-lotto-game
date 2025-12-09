@@ -1,0 +1,14 @@
+Run these commands one by one:
+
+1. Stop the dev server (Ctrl+C)
+
+2. rm -rf node_modules package-lock.json
+
+3. npm cache clean --force
+
+4. npm install
+
+5. npm run dev
+
+OR just run:
+bash reinstall.sh

@@ -1,0 +1,20 @@
+INSTRUCTIONS TO FIX YOUR APP
+=============================
+
+1. Open Terminal
+
+2. Navigate to your project:
+   cd ~/Desktop/sui-lotto-game
+
+3. Make the script executable:
+   chmod +x FIX_AND_START.sh
+
+4. Run the script:
+   ./FIX_AND_START.sh
+
+5. Wait for "Ready" message
+
+6. Open browser to:
+   http://localhost:3000
+
+The app should now work!

@@ -1,0 +1,7 @@
+Stop the dev server (Ctrl+C), then run:
+
+npm install @radix-ui/react-avatar@1.1.2 @radix-ui/react-label@2.1.1 @radix-ui/react-tabs@1.1.2 @radix-ui/react-tooltip@1.1.6 --force
+
+Then start dev server:
+
+npm run dev

@@ -1,0 +1,8 @@
+# Build artifacts
+build/
+Move.lock
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
