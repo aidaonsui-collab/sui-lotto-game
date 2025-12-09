@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Copy, TrendingUp, Users } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 interface PlayerSelection {
@@ -51,7 +51,7 @@ const MOCK_TOP_PLAYERS: PlayerSelection[] = [
 
 export function TopPlayersSelections() {
   const [topPlayers, setTopPlayers] = useState<PlayerSelection[]>([])
-  const { toast } = useToast()
+  // const { toast } = useToast()
 
   useEffect(() => {
     setTopPlayers(MOCK_TOP_PLAYERS)
@@ -66,8 +66,7 @@ export function TopPlayersSelections() {
   const copySelection = (tiles: number[]) => {
     const tilesText = tiles.join(", ")
     navigator.clipboard.writeText(tilesText)
-    toast({
-      title: "Selection Copied!",
+    toast.success("Selection Copied!", {
       description: `Copied tiles: ${tilesText}`,
     })
   }
