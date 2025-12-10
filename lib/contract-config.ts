@@ -1,7 +1,7 @@
 // The Playground - Sui Smart Contract Configuration
 // Update these values after deploying your contract to mainnet/testnet
 
-export const APP_VERSION = "2.0.3-module-fix"
+export const APP_VERSION = "2.0.4-CACHE-BUST-" + Date.now()
 
 export interface ContractConfig {
   NETWORK: "mainnet" | "testnet" | "devnet"
