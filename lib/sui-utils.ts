@@ -10,7 +10,7 @@ export function createStartRoundTransaction(gameStateId: string) {
   const tx = new Transaction()
 
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::start_round`,
+    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::start_round`,
     arguments: [
       tx.object(gameStateId),
       tx.object("0x6"), // Clock object
@@ -33,7 +33,7 @@ export function createPlayGameTransaction(gameStateId: string, betAmount: number
   const [coin] = tx.splitCoins(tx.gas, [betInMist])
 
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::play_game`,
+    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::play_game`,
     arguments: [
       tx.object(gameStateId),
       coin,
@@ -52,7 +52,7 @@ export function createEndRoundTransaction(gameStateId: string, randomObjectId: s
   const tx = new Transaction()
 
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::end_round`,
+    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::end_round`,
     arguments: [
       tx.object(gameStateId),
       tx.object(randomObjectId), // Random object
@@ -70,7 +70,7 @@ export function createClaimJackpotTransaction(gameStateId: string, randomObjectI
   const tx = new Transaction()
 
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::claim_jackpot`,
+    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::claim_jackpot`,
     arguments: [
       tx.object(gameStateId),
       tx.object(randomObjectId), // Random object
@@ -88,7 +88,7 @@ export function createClaimLuckyBoxTransaction(gameStateId: string) {
   const tx = new Transaction()
 
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::claim_lucky_box`,
+    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::claim_lucky_box`,
     arguments: [
       tx.object(gameStateId),
       tx.object("0x6"), // Clock object
