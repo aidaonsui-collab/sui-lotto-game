@@ -32,24 +32,33 @@ export function GameBoard() {
 
   useEffect(() => {
     async function fetchBalance() {
+      console.log("[v0] Starting balance fetch...")
+      console.log("[v0] Current account:", currentAccount?.address)
+
       if (!currentAccount?.address) {
+        console.log("[v0] No account connected, setting balance to 0")
         setBalance(0)
         return
       }
 
       try {
+        console.log("[v0] Fetching balances from blockchain...")
         const balances = await client.getAllBalances({
           owner: currentAccount.address,
         })
+        console.log("[v0] Balances received:", balances)
 
         const suiBalance = balances.find((b) => b.coinType === "0x2::sui::SUI")
         if (suiBalance) {
-          setBalance(mistToSui(BigInt(suiBalance.totalBalance)))
+          const balanceInSui = mistToSui(BigInt(suiBalance.totalBalance))
+          console.log("[v0] SUI balance:", balanceInSui)
+          setBalance(balanceInSui)
         } else {
+          console.log("[v0] No SUI balance found")
           setBalance(0)
         }
       } catch (error) {
-        console.error("Error fetching balance:", error)
+        console.error("[v0] Error fetching balance:", error)
         setBalance(0)
       }
     }
@@ -87,6 +96,13 @@ export function GameBoard() {
   }
 
   const handleStartGame = async () => {
+    console.log("[v0] Start game clicked")
+    console.log("[v0] Current account:", currentAccount)
+    console.log("[v0] Contract configured:", isContractConfigured())
+    console.log("[v0] Bet amount:", betAmount, "Min bet:", MIN_BET)
+    console.log("[v0] Selected tiles:", selectedTiles)
+    console.log("[v0] Balance:", balance)
+
     if (!currentAccount) {
       toast.error("Please connect your wallet first!")
       return
@@ -113,9 +129,11 @@ export function GameBoard() {
     }
 
     setIsSubmitting(true)
+    console.log("[v0] Creating transaction...")
 
     try {
       const tx = createPlayGameTransaction(CONTRACT_CONFIG.GAME_STATE_ID, betAmount, selectedTiles)
+      console.log("[v0] Transaction created, signing...")
 
       signAndExecuteTransaction(
         {
@@ -123,7 +141,7 @@ export function GameBoard() {
         },
         {
           onSuccess: (result) => {
-            console.log("Transaction successful:", result.digest)
+            console.log("[v0] Transaction successful:", result.digest)
             toast.success("Game started! Transaction confirmed", {
               description: `TX: ${result.digest.slice(0, 8)}...`,
             })
