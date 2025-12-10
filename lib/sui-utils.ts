@@ -1,7 +1,11 @@
 // Sui blockchain utility functions for The Playground
+// v2.0.2 - Module name fix for mainnet deployment
 
 import { Transaction } from "@mysten/sui/transactions"
 import { CONTRACT_CONFIG, suiToMist } from "./contract-config"
+
+console.log("[v0] sui-utils.ts loaded - using module: lotto_game")
+console.log("[v0] Package ID:", CONTRACT_CONFIG.PACKAGE_ID)
 
 /**
  * Create a transaction to start a new game round
@@ -9,8 +13,11 @@ import { CONTRACT_CONFIG, suiToMist } from "./contract-config"
 export function createStartRoundTransaction(gameStateId: string) {
   const tx = new Transaction()
 
+  const target = `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::start_round`
+  console.log("[v0] Creating start_round transaction with target:", target)
+
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::start_round`,
+    target,
     arguments: [
       tx.object(gameStateId),
       tx.object("0x6"), // Clock object
@@ -29,11 +36,16 @@ export function createPlayGameTransaction(gameStateId: string, betAmount: number
   // Convert SUI to MIST
   const betInMist = suiToMist(betAmount)
 
+  const target = `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::play_game`
+  console.log("[v0] Creating play_game transaction with target:", target)
+  console.log("[v0] Bet amount:", betAmount, "SUI (", betInMist.toString(), "MIST)")
+  console.log("[v0] Selected tiles:", selectedTiles)
+
   // Split coin for the bet
   const [coin] = tx.splitCoins(tx.gas, [betInMist])
 
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::play_game`,
+    target,
     arguments: [
       tx.object(gameStateId),
       coin,
@@ -51,8 +63,11 @@ export function createPlayGameTransaction(gameStateId: string, betAmount: number
 export function createEndRoundTransaction(gameStateId: string, randomObjectId: string) {
   const tx = new Transaction()
 
+  const target = `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::end_round`
+  console.log("[v0] Creating end_round transaction with target:", target)
+
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::end_round`,
+    target,
     arguments: [
       tx.object(gameStateId),
       tx.object(randomObjectId), // Random object
@@ -69,8 +84,11 @@ export function createEndRoundTransaction(gameStateId: string, randomObjectId: s
 export function createClaimJackpotTransaction(gameStateId: string, randomObjectId: string) {
   const tx = new Transaction()
 
+  const target = `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::claim_jackpot`
+  console.log("[v0] Creating claim_jackpot transaction with target:", target)
+
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::claim_jackpot`,
+    target,
     arguments: [
       tx.object(gameStateId),
       tx.object(randomObjectId), // Random object
@@ -87,8 +105,11 @@ export function createClaimJackpotTransaction(gameStateId: string, randomObjectI
 export function createClaimLuckyBoxTransaction(gameStateId: string) {
   const tx = new Transaction()
 
+  const target = `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::claim_lucky_box`
+  console.log("[v0] Creating claim_lucky_box transaction with target:", target)
+
   tx.moveCall({
-    target: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::claim_lucky_box`,
+    target,
     arguments: [
       tx.object(gameStateId),
       tx.object("0x6"), // Clock object
