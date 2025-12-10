@@ -4,6 +4,7 @@ import { createNetworkConfig, SuiClientProvider, WalletProvider } from "@mysten/
 import { getFullnodeUrl } from "@mysten/sui/client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { ReactNode } from "react"
+import { CONTRACT_CONFIG } from "@/lib/contract-config"
 
 // Configure the Sui network
 const { networkConfig } = createNetworkConfig({
@@ -23,9 +24,13 @@ const queryClient = new QueryClient({
 })
 
 export function SuiWalletProvider({ children }: { children: ReactNode }) {
+  const defaultNetwork = CONTRACT_CONFIG.NETWORK
+
+  console.log("[v0] SuiWalletProvider network:", defaultNetwork)
+
   return (
     <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
+      <SuiClientProvider networks={networkConfig} defaultNetwork={defaultNetwork}>
         <WalletProvider>{children}</WalletProvider>
       </SuiClientProvider>
     </QueryClientProvider>
