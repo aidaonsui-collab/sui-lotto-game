@@ -1,13 +1,13 @@
 // Sui blockchain utility functions for The Playground
 
-import { TransactionBlock } from "@mysten/sui.js/transactions"
+import { Transaction } from "@mysten/sui/transactions"
 import { CONTRACT_CONFIG, suiToMist } from "./contract-config"
 
 /**
  * Create a transaction to start a new game round
  */
 export function createStartRoundTransaction(gameStateId: string) {
-  const tx = new TransactionBlock()
+  const tx = new Transaction()
 
   tx.moveCall({
     target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::start_round`,
@@ -24,20 +24,20 @@ export function createStartRoundTransaction(gameStateId: string) {
  * Create a transaction to play the game
  */
 export function createPlayGameTransaction(gameStateId: string, betAmount: number, selectedTiles: number[]) {
-  const tx = new TransactionBlock()
+  const tx = new Transaction()
 
   // Convert SUI to MIST
   const betInMist = suiToMist(betAmount)
 
   // Split coin for the bet
-  const [coin] = tx.splitCoins(tx.gas, [tx.pure(betInMist.toString())])
+  const [coin] = tx.splitCoins(tx.gas, [betInMist])
 
   tx.moveCall({
     target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::play_game`,
     arguments: [
       tx.object(gameStateId),
       coin,
-      tx.pure(selectedTiles),
+      tx.pure.vector("u8", selectedTiles),
       tx.object("0x6"), // Clock object
     ],
   })
@@ -49,7 +49,7 @@ export function createPlayGameTransaction(gameStateId: string, betAmount: number
  * Create a transaction to end the current round
  */
 export function createEndRoundTransaction(gameStateId: string, randomObjectId: string) {
-  const tx = new TransactionBlock()
+  const tx = new Transaction()
 
   tx.moveCall({
     target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::end_round`,
@@ -67,7 +67,7 @@ export function createEndRoundTransaction(gameStateId: string, randomObjectId: s
  * Create a transaction to claim jackpot
  */
 export function createClaimJackpotTransaction(gameStateId: string, randomObjectId: string) {
-  const tx = new TransactionBlock()
+  const tx = new Transaction()
 
   tx.moveCall({
     target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::claim_jackpot`,
@@ -85,7 +85,7 @@ export function createClaimJackpotTransaction(gameStateId: string, randomObjectI
  * Create a transaction to claim lucky box
  */
 export function createClaimLuckyBoxTransaction(gameStateId: string) {
-  const tx = new TransactionBlock()
+  const tx = new Transaction()
 
   tx.moveCall({
     target: `${CONTRACT_CONFIG.PACKAGE_ID}::playground::claim_lucky_box`,
