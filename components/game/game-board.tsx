@@ -10,11 +10,12 @@ import { BetAmount } from "./bet-amount"
 import { LuckyBoxModal } from "./lucky-box-modal"
 import { toast } from "sonner"
 import { Coins, Play, RotateCcw } from "lucide-react"
-import { createPlayGameTransaction } from "@/lib/sui-utils"
+import { createPlayGameTransaction } from "@/lib/sui-transactions"
 import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
 
 const GAME_DURATION = 60
 const MIN_BET = 0.05
+const APP_VERSION = "v3.0.0-module-fix"
 
 export function GameBoard() {
   const currentAccount = useCurrentAccount()
@@ -287,6 +288,8 @@ export function GameBoard() {
                 Contract not configured. Please deploy and update environment variables.
               </p>
             )}
+
+            <p className="text-center text-xs text-muted-foreground/50">{APP_VERSION}</p>
           </CardContent>
         </Card>
       </div>
