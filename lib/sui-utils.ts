@@ -1,10 +1,11 @@
 // Sui blockchain utility functions for The Playground
-// v2.0.2 - Module name fix for mainnet deployment
+// v2.0.3 - Cache-busted module name fix
 
 import { Transaction } from "@mysten/sui/transactions"
-import { CONTRACT_CONFIG, suiToMist } from "./contract-config"
+import { CONTRACT_CONFIG, suiToMist, APP_VERSION } from "./contract-config"
 
-console.log("[v0] sui-utils.ts loaded - using module: lotto_game")
+console.log("[v0] sui-utils.ts loaded - version:", APP_VERSION)
+console.log("[v0] Using module: lotto_game (NOT playground)")
 console.log("[v0] Package ID:", CONTRACT_CONFIG.PACKAGE_ID)
 
 /**

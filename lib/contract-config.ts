@@ -1,6 +1,8 @@
 // The Playground - Sui Smart Contract Configuration
 // Update these values after deploying your contract to mainnet/testnet
 
+export const APP_VERSION = "2.0.3-module-fix"
+
 export interface ContractConfig {
   NETWORK: "mainnet" | "testnet" | "devnet"
   PACKAGE_ID: string
@@ -18,7 +20,7 @@ export interface ContractConfig {
 
 export const CONTRACT_CONFIG = {
   // Network Configuration
-  NETWORK: (process.env.NEXT_PUBLIC_SUI_NETWORK || process.env.NEXT_PUBLIC_NETWORK || "testnet") as
+  NETWORK: (process.env.NEXT_PUBLIC_SUI_NETWORK || process.env.NEXT_PUBLIC_NETWORK || "mainnet") as
     | "mainnet"
     | "testnet"
     | "devnet",
@@ -81,4 +83,14 @@ export function validateContractConfig(): { valid: boolean; errors: string[] } {
     valid: errors.length === 0,
     errors,
   }
+}
+
+if (typeof window !== "undefined") {
+  console.log("[v0] Contract Config Loaded:", {
+    version: APP_VERSION, // Log version for debugging
+    network: CONTRACT_CONFIG.NETWORK,
+    packageId: CONTRACT_CONFIG.PACKAGE_ID,
+    gameStateId: CONTRACT_CONFIG.GAME_STATE_ID,
+    isConfigured: isContractConfigured(),
+  })
 }
