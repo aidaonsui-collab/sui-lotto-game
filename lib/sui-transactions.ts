@@ -1,9 +1,9 @@
 // NEW FILE - Force Vercel to rebuild by creating a new file path
-// Version: 3.0.0 - Module name: lotto_game (NOT playground)
+// Version: 3.1.0 - Module name: lotto_game (NOT playground)
 import { Transaction } from "@mysten/sui/transactions"
 import { CONTRACT_CONFIG, suiToMist } from "./contract-config"
 
-console.log("[v0] sui-transactions.ts loaded - Version 3.0.0")
+console.log("[v0] sui-transactions.ts loaded - Version 3.1.0")
 console.log("[v0] Using MODULE NAME: lotto_game (not playground)")
 console.log("[v0] Package ID:", CONTRACT_CONFIG.PACKAGE_ID)
 
@@ -25,6 +25,28 @@ export function createStartRoundTransaction(gameStateId: string) {
     arguments: [
       tx.object(gameStateId),
       tx.object("0x6"), // Clock object
+    ],
+  })
+
+  return tx
+}
+
+/**
+ * Create a transaction to end the current game round
+ */
+export function createEndRoundTransaction(gameStateId: string) {
+  console.log("[v0] createEndRoundTransaction called")
+  const tx = new Transaction()
+
+  const target = `${CONTRACT_CONFIG.PACKAGE_ID}::${MODULE_NAME}::end_round`
+  console.log("[v0] Transaction target:", target)
+
+  tx.moveCall({
+    target,
+    arguments: [
+      tx.object(gameStateId),
+      tx.object("0x6"), // Clock object
+      tx.object("0x8"), // Random object
     ],
   })
 

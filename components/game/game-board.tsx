@@ -9,13 +9,17 @@ import { GameTimer } from "./game-timer"
 import { BetAmount } from "./bet-amount"
 import { LuckyBoxModal } from "./lucky-box-modal"
 import { toast } from "sonner"
-import { Coins, Play, RotateCcw, Zap } from "lucide-react"
-import { createPlayGameTransaction, createStartRoundTransaction } from "@/lib/sui-transactions"
+import { Coins, Play, RotateCcw, Zap, StopCircle } from "lucide-react"
+import {
+  createPlayGameTransaction,
+  createStartRoundTransaction,
+  createEndRoundTransaction,
+} from "@/lib/sui-transactions"
 import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
 
 const GAME_DURATION = 60
 const MIN_BET = 0.05
-const APP_VERSION = "v3.1.0-start-round-fix"
+const APP_VERSION = "v3.2.0-end-round-fix"
 
 export function GameBoard() {
   const currentAccount = useCurrentAccount()
@@ -32,6 +36,7 @@ export function GameBoard() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isRoundActive, setIsRoundActive] = useState(false)
   const [isCheckingRound, setIsCheckingRound] = useState(true)
+  const [roundEndTime, setRoundEndTime] = useState<number>(0)
 
   useEffect(() => {
     async function checkRoundStatus() {
@@ -50,12 +55,15 @@ export function GameBoard() {
         if (gameState.data && gameState.data.content && gameState.data.content.dataType === "moveObject") {
           const fields = gameState.data.content.fields as any
           const isActive = fields.is_active || false
-          console.log("[v0] Game round active:", isActive)
+          const endTime = fields.round_end_time ? Number.parseInt(fields.round_end_time) : 0
+          console.log("[v0] Game round active:", isActive, "End time:", endTime)
           setIsRoundActive(isActive)
+          setRoundEndTime(endTime)
         }
       } catch (error) {
         console.error("[v0] Error checking round status:", error)
         setIsRoundActive(false)
+        setRoundEndTime(0)
       } finally {
         setIsCheckingRound(false)
       }
@@ -303,6 +311,74 @@ export function GameBoard() {
     toast.info("Game reset. Select your tiles and start again!")
   }
 
+  const handleEndRound = async () => {
+    console.log("[v0] End round clicked")
+
+    if (!currentAccount) {
+      toast.error("Please connect your wallet first!")
+      return
+    }
+
+    if (!isContractConfigured()) {
+      toast.error("Smart contract not configured.")
+      return
+    }
+
+    if (!isRoundActive) {
+      toast.error("No active round to end.")
+      return
+    }
+
+    const currentTime = Date.now()
+    if (currentTime < roundEndTime) {
+      toast.error(`Round still active. ${Math.ceil((roundEndTime - currentTime) / 1000)}s remaining.`)
+      return
+    }
+
+    setIsSubmitting(true)
+    console.log("[v0] Creating end round transaction...")
+
+    try {
+      const tx = createEndRoundTransaction(CONTRACT_CONFIG.GAME_STATE_ID)
+      console.log("[v0] Transaction created, signing...")
+
+      signAndExecuteTransaction(
+        {
+          transaction: tx,
+        },
+        {
+          onSuccess: (result) => {
+            console.log("[v0] Round ended successfully:", result.digest)
+            toast.success("Game round ended! Results calculated.", {
+              description: `TX: ${result.digest.slice(0, 8)}...`,
+            })
+            setIsRoundActive(false)
+            setRoundEndTime(0)
+            setIsSubmitting(false)
+          },
+          onError: (error) => {
+            console.error("End round error:", error)
+            toast.error("Failed to end round", {
+              description: error.message || "Please try again",
+            })
+            setIsSubmitting(false)
+          },
+        },
+      )
+    } catch (error: any) {
+      console.error("Error creating end round transaction:", error)
+      toast.error("Failed to create transaction", {
+        description: error.message || "Please try again",
+      })
+      setIsSubmitting(false)
+    }
+  }
+
+  const canEndRound = () => {
+    if (!isRoundActive || !roundEndTime) return false
+    return Date.now() >= roundEndTime
+  }
+
   return (
     <>
       <div className="max-w-4xl mx-auto space-y-6">
@@ -321,6 +397,27 @@ export function GameBoard() {
                 >
                   <Zap className="mr-2 h-4 w-4" />
                   {isSubmitting ? "Starting..." : "Start Round"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isCheckingRound && isRoundActive && canEndRound() && currentAccount && (
+          <Card className="border-blue-500/50 bg-blue-500/10">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-blue-700 dark:text-blue-300">Round Time Expired</p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">End this round to start a new one</p>
+                </div>
+                <Button
+                  onClick={handleEndRound}
+                  disabled={isSubmitting}
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0"
+                >
+                  <StopCircle className="mr-2 h-4 w-4" />
+                  {isSubmitting ? "Ending..." : "End Round"}
                 </Button>
               </div>
             </CardContent>
