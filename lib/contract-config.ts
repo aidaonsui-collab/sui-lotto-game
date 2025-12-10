@@ -18,11 +18,17 @@ export interface ContractConfig {
 
 export const CONTRACT_CONFIG = {
   // Network Configuration
-  NETWORK: (process.env.NEXT_PUBLIC_NETWORK || "testnet") as "mainnet" | "testnet" | "devnet",
+  NETWORK: (process.env.NEXT_PUBLIC_SUI_NETWORK || process.env.NEXT_PUBLIC_NETWORK || "testnet") as
+    | "mainnet"
+    | "testnet"
+    | "devnet",
 
   // Contract Addresses (Update these after deployment)
   PACKAGE_ID: process.env.NEXT_PUBLIC_PACKAGE_ID || "0xYOUR_PACKAGE_ID_HERE",
-  GAME_STATE_ID: process.env.NEXT_PUBLIC_GAME_STATE_ID || "0xYOUR_GAME_STATE_OBJECT_ID_HERE",
+  GAME_STATE_ID:
+    process.env.NEXT_PUBLIC_GAME_OBJECT_ID ||
+    process.env.NEXT_PUBLIC_GAME_STATE_ID ||
+    "0xYOUR_GAME_STATE_OBJECT_ID_HERE",
 
   // Developer wallet address (hardcoded in smart contract)
   DEVELOPER_ADDRESS: "0x92a32ac7fd525f8bd37ed359423b8d7d858cad26224854dfbff1914b75ee658b",
@@ -66,7 +72,9 @@ export function validateContractConfig(): { valid: boolean; errors: string[] } {
   }
 
   if (!CONTRACT_CONFIG.GAME_STATE_ID || CONTRACT_CONFIG.GAME_STATE_ID.includes("YOUR_GAME_STATE")) {
-    errors.push("NEXT_PUBLIC_GAME_STATE_ID is not set. Please update your .env.local file.")
+    errors.push(
+      "NEXT_PUBLIC_GAME_STATE_ID or NEXT_PUBLIC_GAME_OBJECT_ID is not set. Please update your .env.local file.",
+    )
   }
 
   return {

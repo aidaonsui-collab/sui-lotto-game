@@ -23,6 +23,7 @@ export function GameBoard() {
 
   const [selectedTiles, setSelectedTiles] = useState<number[]>([])
   const [betAmount, setBetAmount] = useState(MIN_BET)
+  const [gameStarted, setGameStarted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState(GAME_DURATION)
   const [showLuckyBox, setShowLuckyBox] = useState(false)
@@ -48,7 +49,7 @@ export function GameBoard() {
           setBalance(0)
         }
       } catch (error) {
-        console.error("[v0] Error fetching balance:", error)
+        console.error("Error fetching balance:", error)
         setBalance(0)
       }
     }
@@ -122,10 +123,11 @@ export function GameBoard() {
         },
         {
           onSuccess: (result) => {
-            console.log("[v0] Transaction successful:", result.digest)
+            console.log("Transaction successful:", result.digest)
             toast.success("Game started! Transaction confirmed", {
               description: `TX: ${result.digest.slice(0, 8)}...`,
             })
+            setGameStarted(true)
             setIsPlaying(true)
             setTimeRemaining(GAME_DURATION)
             setIsSubmitting(false)
@@ -138,7 +140,7 @@ export function GameBoard() {
             }, 2000)
           },
           onError: (error) => {
-            console.error("[v0] Transaction error:", error)
+            console.error("Transaction error:", error)
             toast.error("Transaction failed", {
               description: error.message || "Please try again",
             })
@@ -147,7 +149,7 @@ export function GameBoard() {
         },
       )
     } catch (error: any) {
-      console.error("[v0] Error creating transaction:", error)
+      console.error("Error creating transaction:", error)
       toast.error("Failed to create transaction", {
         description: error.message || "Please try again",
       })
@@ -157,6 +159,7 @@ export function GameBoard() {
 
   const handleGameEnd = () => {
     setIsPlaying(false)
+    setGameStarted(false)
 
     const isWinner = Math.random() > 0.5
 
@@ -178,6 +181,11 @@ export function GameBoard() {
   }
 
   const handleReset = () => {
+    if (gameStarted) {
+      toast.warning("Cannot reset during an active game!")
+      return
+    }
+
     setIsPlaying(false)
     setSelectedTiles([])
     setTimeRemaining(GAME_DURATION)
@@ -216,7 +224,7 @@ export function GameBoard() {
                       <span className="text-muted-foreground">Your Balance:</span>
                       <span className="font-bold flex items-center gap-1">
                         <Coins className="h-4 w-4 text-primary" />
-                        {balance.toFixed(3)} SUI
+                        {balance.toFixed(2)} SUI
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -245,6 +253,7 @@ export function GameBoard() {
                   size="lg"
                   variant="outline"
                   className="flex-1 text-lg font-bold bg-transparent"
+                  disabled={gameStarted}
                 >
                   <RotateCcw className="mr-2 h-5 w-5" />
                   Reset
