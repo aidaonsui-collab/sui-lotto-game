@@ -3,15 +3,19 @@
 import { Coins } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
-export interface BetAmountProps {
+export function BetAmount({
+  betAmount,
+  onBetChange,
+  minBet,
+  disabled = false,
+  selectedTiles = 0,
+}: {
   betAmount: number
   onBetChange: (amount: number) => void
   minBet: number
   disabled?: boolean
-  selectedTiles?: number // Made optional
-}
-
-export function BetAmount({ betAmount, onBetChange, minBet, disabled, selectedTiles = 0 }: BetAmountProps) {
+  selectedTiles?: number
+}) {
   const costPerTile = 0.05
   const totalCost = selectedTiles * costPerTile
 
