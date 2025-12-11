@@ -8,10 +8,10 @@ export interface BetAmountProps {
   onBetChange: (amount: number) => void
   minBet: number
   disabled?: boolean
-  selectedTiles: number // Added selectedTiles prop to show tile count
+  selectedTiles?: number // Made optional
 }
 
-export function BetAmount({ betAmount, onBetChange, minBet, disabled, selectedTiles }: BetAmountProps) {
+export function BetAmount({ betAmount, onBetChange, minBet, disabled, selectedTiles = 0 }: BetAmountProps) {
   const costPerTile = 0.05
   const totalCost = selectedTiles * costPerTile
 
@@ -59,4 +59,3 @@ export function BetAmount({ betAmount, onBetChange, minBet, disabled, selectedTi
     </Card>
   )
 }
-// Force rebuild: 2025-12-11 03:30:47

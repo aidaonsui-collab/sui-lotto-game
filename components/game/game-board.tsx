@@ -6,6 +6,7 @@ import { useCurrentAccount } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TileGrid } from "./tile-grid"
+import { BetAmount } from "./bet-amount"
 import { LuckyBoxModal } from "./lucky-box-modal"
 import { WinningTilesReveal } from "./winning-tiles-reveal"
 import { toast } from "sonner"
@@ -16,8 +17,7 @@ import {
   createEndRoundTransaction,
 } from "@/lib/sui-transactions"
 import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
-import { CountdownTimer } from "./countdown-timer" // Added import for CountdownTimer
-import { BetAmountWrapper } from "./bet-amount-wrapper"
+import { CountdownTimer } from "./countdown-timer"
 
 const GAME_DURATION = 60
 const MIN_BET = 0.05
@@ -523,7 +523,7 @@ export function GameBoard() {
                 )}
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <BetAmountWrapper
+                  <BetAmount
                     betAmount={betAmount}
                     onBetChange={setBetAmount}
                     minBet={MIN_BET}
