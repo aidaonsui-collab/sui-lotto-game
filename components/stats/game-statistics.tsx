@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SuiClient } from "@mysten/sui/client"
-import { CONTRACT_CONFIG, mistToSui, isContractConfigured, type ContractConfig } from "@/lib/contract-config"
+import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
 import { TrendingUp, Trophy, Gift, Gamepad2, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -42,46 +42,84 @@ export function GameStatistics() {
 
       try {
         const client = new SuiClient({
-          url: `https://fullnode.${CONTRACT_CONFIG.NETWORK}.sui.io:443`,
+          url:
+            CONTRACT_CONFIG.NETWORK === "mainnet"
+              ? "https://fullnode.mainnet.sui.io:443"
+              : "https://fullnode.testnet.sui.io:443",
         })
 
-        const priceResponse = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=sui&vs_currencies=usd")
-        const priceData = await priceResponse.json()
-        const suiPrice = priceData.sui?.usd || 0
-
-        const gameState = await client.getObject({
-          id: (CONTRACT_CONFIG as ContractConfig).GAME_STATE_ID,
-          options: {
-            showContent: true,
-          },
-        })
-
-        if (gameState.data?.content && "fields" in gameState.data.content) {
-          const fields = gameState.data.content.fields as any
-
-          const totalVolumeSui = mistToSui(BigInt(fields.total_volume || "0"))
-          const totalGamesPlayed = Number(fields.total_games || 0)
-          const totalJackpotWins = Number(fields.jackpot_wins || 0)
-          const totalMysteryBoxWins = Number(fields.mystery_box_wins || 0)
-
-          setStats({
-            totalVolumeSui,
-            totalVolumeUsd: totalVolumeSui * suiPrice,
-            totalGamesPlayed,
-            totalJackpotWins,
-            totalMysteryBoxWins,
-            suiPrice,
-          })
+        let suiPrice = 0
+        try {
+          const priceResponse = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=sui&vs_currencies=usd")
+          if (priceResponse.ok) {
+            const priceData = await priceResponse.json()
+            suiPrice = priceData.sui?.usd || 0
+          }
+        } catch (priceError) {
+          console.log("[v0] Could not fetch SUI price, using 0")
         }
+
+        console.log("[v0] Fetching game events to calculate statistics...")
+
+        const gameEndedEvents = await client.queryEvents({
+          query: {
+            MoveEventType: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::GameEnded`,
+          },
+          limit: 1000,
+        })
+
+        const jackpotEvents = await client.queryEvents({
+          query: {
+            MoveEventType: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::JackpotWon`,
+          },
+          limit: 1000,
+        })
+
+        const luckyBoxEvents = await client.queryEvents({
+          query: {
+            MoveEventType: `${CONTRACT_CONFIG.PACKAGE_ID}::lotto_game::LuckyBoxWon`,
+          },
+          limit: 1000,
+        })
+
+        let totalVolumeMist = 0n
+        const totalGamesPlayed = gameEndedEvents.data.length
+
+        gameEndedEvents.data.forEach((event: any) => {
+          const parsedData = event.parsedJson
+          if (parsedData && parsedData.total_pool) {
+            totalVolumeMist += BigInt(parsedData.total_pool)
+          }
+        })
+
+        const totalVolumeSui = mistToSui(totalVolumeMist)
+        const totalJackpotWins = jackpotEvents.data.length
+        const totalMysteryBoxWins = luckyBoxEvents.data.length
+
+        setStats({
+          totalVolumeSui,
+          totalVolumeUsd: totalVolumeSui * suiPrice,
+          totalGamesPlayed,
+          totalJackpotWins,
+          totalMysteryBoxWins,
+          suiPrice,
+        })
+
+        console.log("[v0] Updated stats from events:", {
+          totalVolumeSui,
+          totalGamesPlayed,
+          totalJackpotWins,
+          totalMysteryBoxWins,
+        })
       } catch (error) {
-        console.error("Error fetching game statistics:", error)
+        console.error("[v0] Error fetching game statistics:", error)
       } finally {
         setLoading(false)
       }
     }
 
     fetchStats()
-    const interval = setInterval(fetchStats, 30000)
+    const interval = setInterval(fetchStats, 10000)
     return () => clearInterval(interval)
   }, [configured])
 

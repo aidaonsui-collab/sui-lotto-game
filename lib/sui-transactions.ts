@@ -58,16 +58,24 @@ export function createEndRoundTransaction(gameStateId: string) {
  */
 export function createPlayGameTransaction(gameStateId: string, betAmount: number, selectedTiles: number[]) {
   console.log("[v0] createPlayGameTransaction called")
-  console.log("[v0] betAmount:", betAmount, "selectedTiles:", selectedTiles)
+  console.log("[v0] betAmount (ignored - calculated from tiles):", betAmount)
+  console.log("[v0] selectedTiles:", selectedTiles, "count:", selectedTiles.length)
 
   const tx = new Transaction()
 
+  const BET_PER_TILE = 0.05 // SUI
+  const calculatedBet = BET_PER_TILE * selectedTiles.length
+  console.log("[v0] Calculated bet (0.05 SUI x", selectedTiles.length, "tiles):", calculatedBet, "SUI")
+
   // Convert SUI to MIST
-  const betInMist = suiToMist(betAmount)
+  const betInMist = suiToMist(calculatedBet)
   console.log("[v0] betInMist:", betInMist)
 
   // Split coin for the bet
   const [coin] = tx.splitCoins(tx.gas, [betInMist])
+
+  const zeroIndexedTiles = selectedTiles.map((tile) => tile - 1)
+  console.log("[v0] Converting tiles from 1-indexed to 0-indexed:", selectedTiles, "->", zeroIndexedTiles)
 
   const target = `${CONTRACT_CONFIG.PACKAGE_ID}::${MODULE_NAME}::play_game`
   console.log("[v0] Transaction target:", target)
@@ -77,7 +85,7 @@ export function createPlayGameTransaction(gameStateId: string, betAmount: number
     arguments: [
       tx.object(gameStateId),
       coin,
-      tx.pure.vector("u8", selectedTiles),
+      tx.pure.vector("u8", zeroIndexedTiles),
       tx.object("0x6"), // Clock object
     ],
   })

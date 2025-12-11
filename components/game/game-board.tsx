@@ -1,35 +1,39 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit"
+import { useState, useEffect, useRef } from "react"
+import { useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TileGrid } from "./tile-grid"
-import { GameTimer } from "./game-timer"
 import { BetAmount } from "./bet-amount"
 import { LuckyBoxModal } from "./lucky-box-modal"
+import { WinningTilesReveal } from "./winning-tiles-reveal"
 import { toast } from "sonner"
-import { Coins, Play, RotateCcw, Zap, StopCircle } from "lucide-react"
+import { Coins, Play, Zap, Trophy, Clock, Loader2 } from "lucide-react"
 import {
   createPlayGameTransaction,
   createStartRoundTransaction,
   createEndRoundTransaction,
 } from "@/lib/sui-transactions"
 import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
+import { CountdownTimer } from "./countdown-timer" // Added import for CountdownTimer
 
 const GAME_DURATION = 60
 const MIN_BET = 0.05
-const APP_VERSION = "v3.2.0-end-round-fix"
+const BET_PER_TILE = 0.05
+const APP_VERSION = "v3.4.0-winning-tiles-reveal"
+const REVEAL_DURATION = 5000 // 5 seconds
 
 export function GameBoard() {
   const currentAccount = useCurrentAccount()
   const client = useSuiClient()
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction()
-
+  const [mounted, setMounted] = useState(false)
   const [selectedTiles, setSelectedTiles] = useState<number[]>([])
+  const [submittedTiles, setSubmittedTiles] = useState<number[]>([])
   const [betAmount, setBetAmount] = useState(MIN_BET)
   const [gameStarted, setGameStarted] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState(GAME_DURATION)
   const [showLuckyBox, setShowLuckyBox] = useState(false)
   const [balance, setBalance] = useState(0)
@@ -37,68 +41,119 @@ export function GameBoard() {
   const [isRoundActive, setIsRoundActive] = useState(false)
   const [isCheckingRound, setIsCheckingRound] = useState(true)
   const [roundEndTime, setRoundEndTime] = useState<number>(0)
+  const [gameState, setGameState] = useState<any>(null)
 
-  useEffect(() => {
-    async function checkRoundStatus() {
-      if (!isContractConfigured()) {
-        setIsCheckingRound(false)
-        return
-      }
+  const [winningTiles, setWinningTiles] = useState<number[]>([])
+  const [showWinningTiles, setShowWinningTiles] = useState(false)
+  const [playerResult, setPlayerResult] = useState<{ won: boolean; matches: number; winAmount?: number } | null>(null)
+  const [canEndRoundAfterReveal, setCanEndRoundAfterReveal] = useState(false)
+  const userDismissedModalRef = useRef(false)
+  const lastRevealedRoundRef = useRef<number>(0)
+  const [autoRestart, setAutoRestart] = useState(false)
 
-      try {
-        console.log("[v0] Checking if game round is active...")
-        const gameState = await client.getObject({
-          id: CONTRACT_CONFIG.GAME_STATE_ID,
-          options: { showContent: true },
-        })
-
-        if (gameState.data && gameState.data.content && gameState.data.content.dataType === "moveObject") {
-          const fields = gameState.data.content.fields as any
-          const isActive = fields.is_active || false
-          const endTime = fields.round_end_time ? Number.parseInt(fields.round_end_time) : 0
-          console.log("[v0] Game round active:", isActive, "End time:", endTime)
-          setIsRoundActive(isActive)
-          setRoundEndTime(endTime)
-        }
-      } catch (error) {
-        console.error("[v0] Error checking round status:", error)
-        setIsRoundActive(false)
-        setRoundEndTime(0)
-      } finally {
-        setIsCheckingRound(false)
-      }
+  const checkRoundStatus = async () => {
+    if (!isContractConfigured()) {
+      setIsCheckingRound(false)
+      return
     }
 
+    try {
+      const gameStateObj = await client.getObject({
+        id: CONTRACT_CONFIG.GAME_STATE_ID,
+        options: { showContent: true },
+      })
+
+      if (gameStateObj.data && gameStateObj.data.content && gameStateObj.data.content.dataType === "moveObject") {
+        const fields = gameStateObj.data.content as any
+        const isActive = fields.fields?.is_active || false
+        const endTime = fields.fields?.round_end_time ? Number.parseInt(fields.fields.round_end_time) : 0
+        const currentRound = fields.fields?.current_round ? Number.parseInt(fields.fields.current_round) : 0
+
+        console.log("[v0] Round status check:", { isActive, endTime, currentRound, hasStartTime: endTime > 0 })
+
+        const isRoundProperlyStarted = isActive && endTime > 0
+        setIsRoundActive(isRoundProperlyStarted)
+        setRoundEndTime(endTime)
+        setGameState(fields)
+
+        const currentTime = Date.now()
+        if (endTime > 0 && currentTime >= endTime) {
+          const winningTilesData = fields.fields?.winning_tiles || []
+          if (
+            winningTilesData.length > 0 &&
+            currentRound !== lastRevealedRoundRef.current &&
+            !userDismissedModalRef.current
+          ) {
+            console.log("[v0] Winning tiles found:", winningTilesData)
+            const winningNumbers = winningTilesData.map((t: string) => Number.parseInt(t) + 1)
+            setWinningTiles(winningNumbers)
+
+            if (submittedTiles.length > 0) {
+              const matches = submittedTiles.filter((tile) => winningNumbers.includes(tile)).length
+              const requiredMatches = Math.ceil(winningNumbers.length / 2)
+              const won = matches >= requiredMatches
+
+              setPlayerResult({
+                won,
+                matches,
+                winAmount: won ? betAmount * 1.5 : undefined,
+              })
+              console.log("[v0] Player result:", { won, matches, requiredMatches, submittedTiles, winningNumbers })
+            }
+
+            setShowWinningTiles(true)
+            setCanEndRoundAfterReveal(false)
+            lastRevealedRoundRef.current = currentRound
+
+            setTimeout(() => {
+              setCanEndRoundAfterReveal(true)
+            }, REVEAL_DURATION)
+          }
+        }
+
+        if (!isActive && endTime > 0 && currentTime >= endTime && autoRestart && currentAccount) {
+          console.log("[v0] Auto-restart: Round ended, starting new round...")
+          setTimeout(() => handleStartRound(), 2000)
+        }
+
+        if (isActive && currentRound !== lastRevealedRoundRef.current) {
+          userDismissedModalRef.current = false
+          setPlayerResult(null)
+        }
+      }
+    } catch (error) {
+      console.error("[v0] Error checking round status:", error)
+      setIsRoundActive(false)
+      setRoundEndTime(0)
+      setGameState(null)
+    } finally {
+      setIsCheckingRound(false)
+    }
+  }
+
+  useEffect(() => {
     checkRoundStatus()
-    const interval = setInterval(checkRoundStatus, 5000) // Check every 5 seconds
+    const interval = setInterval(checkRoundStatus, 5000)
     return () => clearInterval(interval)
   }, [client])
 
   useEffect(() => {
     async function fetchBalance() {
-      console.log("[v0] Starting balance fetch...")
-      console.log("[v0] Current account:", currentAccount?.address)
-
       if (!currentAccount?.address) {
-        console.log("[v0] No account connected, setting balance to 0")
         setBalance(0)
         return
       }
 
       try {
-        console.log("[v0] Fetching balances from blockchain...")
         const balances = await client.getAllBalances({
           owner: currentAccount.address,
         })
-        console.log("[v0] Balances received:", balances)
 
         const suiBalance = balances.find((b) => b.coinType === "0x2::sui::SUI")
         if (suiBalance) {
           const balanceInSui = mistToSui(BigInt(suiBalance.totalBalance))
-          console.log("[v0] SUI balance:", balanceInSui)
           setBalance(balanceInSui)
         } else {
-          console.log("[v0] No SUI balance found")
           setBalance(0)
         }
       } catch (error) {
@@ -113,22 +168,20 @@ export function GameBoard() {
   }, [currentAccount, client])
 
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    setMounted(true)
+  }, [])
 
-    if (isPlaying && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            handleGameEnd()
-            return GAME_DURATION
-          }
-          return prev - 1
-        })
-      }, 1000)
-    }
-
-    return () => clearInterval(interval)
-  }, [isPlaying, timeRemaining])
+  if (!mounted) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const handleTileSelect = (tileNumber: number) => {
     setSelectedTiles((prev) => {
@@ -140,67 +193,51 @@ export function GameBoard() {
   }
 
   const handleStartRound = async () => {
-    console.log("[v0] Start round clicked")
-
     if (!currentAccount) {
-      toast.error("Please connect your wallet first!")
+      toast.error("Please connect your wallet first")
       return
     }
 
     if (!isContractConfigured()) {
-      toast.error("Smart contract not configured.")
+      toast.error("Smart contract not configured. Please update environment variables.")
       return
     }
 
     setIsSubmitting(true)
-    console.log("[v0] Creating start round transaction...")
 
     try {
       const tx = createStartRoundTransaction(CONTRACT_CONFIG.GAME_STATE_ID)
-      console.log("[v0] Transaction created, signing...")
 
-      signAndExecuteTransaction(
-        {
-          transaction: tx,
-        },
-        {
-          onSuccess: (result) => {
-            console.log("[v0] Round started successfully:", result.digest)
-            toast.success("Game round started!", {
-              description: `TX: ${result.digest.slice(0, 8)}...`,
-            })
-            setIsRoundActive(true)
-            setIsSubmitting(false)
+      await new Promise((resolve, reject) => {
+        signAndExecuteTransaction(
+          {
+            transaction: tx,
           },
-          onError: (error) => {
-            console.error("Start round error:", error)
-            toast.error("Failed to start round", {
-              description: error.message || "Please try again",
-            })
-            setIsSubmitting(false)
+          {
+            onSuccess: async () => {
+              toast.success("Round started successfully!")
+              await checkRoundStatus()
+              resolve(undefined)
+            },
+            onError: (error) => {
+              console.error("[v0] Failed to start round:", error)
+              toast.error(`Failed to start round: ${error.message || "Unknown error"}`)
+              reject(error)
+            },
           },
-        },
-      )
-    } catch (error: any) {
-      console.error("Error creating start round transaction:", error)
-      toast.error("Failed to create transaction", {
-        description: error.message || "Please try again",
+        )
       })
+    } catch (error: any) {
+      console.error("[v0] Error starting round:", error)
+      toast.error(`Error: ${error.message || "Failed to start round"}`)
+    } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleStartGame = async () => {
-    console.log("[v0] Start game clicked")
-    console.log("[v0] Current account:", currentAccount)
-    console.log("[v0] Contract configured:", isContractConfigured())
-    console.log("[v0] Bet amount:", betAmount, "Min bet:", MIN_BET)
-    console.log("[v0] Selected tiles:", selectedTiles)
-    console.log("[v0] Balance:", balance)
-    console.log("[v0] Round active:", isRoundActive)
-
     if (!currentAccount) {
-      toast.error("Please connect your wallet first!")
+      toast.error("Please connect your wallet first")
       return
     }
 
@@ -211,6 +248,13 @@ export function GameBoard() {
 
     if (!isRoundActive) {
       toast.error("No active game round. Please start a round first!")
+      return
+    }
+
+    if (roundEndTime > 0 && Date.now() >= roundEndTime) {
+      toast.error("Round time has expired", {
+        description: "Please wait for the round to end and a new one to start",
+      })
       return
     }
 
@@ -230,11 +274,9 @@ export function GameBoard() {
     }
 
     setIsSubmitting(true)
-    console.log("[v0] Creating transaction...")
 
     try {
       const tx = createPlayGameTransaction(CONTRACT_CONFIG.GAME_STATE_ID, betAmount, selectedTiles)
-      console.log("[v0] Transaction created, signing...")
 
       signAndExecuteTransaction(
         {
@@ -242,42 +284,28 @@ export function GameBoard() {
         },
         {
           onSuccess: (result) => {
-            console.log("[v0] Transaction successful:", result.digest)
             toast.success("Game started! Transaction confirmed", {
-              description: `TX: ${result.digest.slice(0, 8)}...`,
+              description: "Your tiles have been submitted. Good luck!",
             })
-            setGameStarted(true)
-            setIsPlaying(true)
-            setTimeRemaining(GAME_DURATION)
+            setSubmittedTiles([...selectedTiles])
+            setSelectedTiles([])
             setIsSubmitting(false)
-
-            setTimeout(() => {
-              client.getAllBalances({ owner: currentAccount.address }).then((balances) => {
-                const suiBalance = balances.find((b) => b.coinType === "0x2::sui::SUI")
-                if (suiBalance) setBalance(mistToSui(BigInt(suiBalance.totalBalance)))
-              })
-            }, 2000)
           },
           onError: (error) => {
-            console.error("Transaction error:", error)
-            toast.error("Transaction failed", {
-              description: error.message || "Please try again",
-            })
+            console.error("[v0] Play game error:", error)
+            toast.error("Failed to start game. Please try again.")
             setIsSubmitting(false)
           },
         },
       )
-    } catch (error: any) {
-      console.error("Error creating transaction:", error)
-      toast.error("Failed to create transaction", {
-        description: error.message || "Please try again",
-      })
+    } catch (error) {
+      console.error("[v0] Play game error:", error)
+      toast.error("An error occurred. Please try again.")
       setIsSubmitting(false)
     }
   }
 
   const handleGameEnd = () => {
-    setIsPlaying(false)
     setGameStarted(false)
 
     const isWinner = Math.random() > 0.5
@@ -305,17 +333,73 @@ export function GameBoard() {
       return
     }
 
-    setIsPlaying(false)
-    setSelectedTiles([])
+    setGameStarted(false)
     setTimeRemaining(GAME_DURATION)
-    toast.info("Game reset. Select your tiles and start again!")
+    setSelectedTiles([])
+    setBetAmount(MIN_BET)
+  }
+
+  const canShowEndRoundButton = () => {
+    if (!gameState || !isRoundActive) return false
+
+    const endTime = gameState.fields?.round_end_time ? Number.parseInt(gameState.fields.round_end_time) : 0
+    if (endTime === 0) return false // Round was never started
+
+    const currentTime = Date.now()
+    const hasExpired = endTime > 0 && currentTime >= endTime
+
+    console.log("[v0] canShowEndRoundButton check:", {
+      isRoundActive,
+      endTime,
+      currentTime,
+      hasExpired,
+      result: hasExpired,
+    })
+
+    return hasExpired
+  }
+
+  const shouldShowStartButton = () => {
+    if (!gameState || !currentAccount) return false
+
+    const endTime = gameState.fields?.round_end_time ? Number.parseInt(gameState.fields.round_end_time) : 0
+    const hasEndTime = endTime > 0
+
+    const result = !isRoundActive && (!hasEndTime || !canShowEndRoundButton())
+    console.log("[v0] shouldShowStartButton check:", {
+      isRoundActive,
+      hasEndTime,
+      canShowEndRound: canShowEndRoundButton(),
+      result,
+    })
+
+    return result
+  }
+
+  const handleWinningTilesComplete = () => {
+    console.log("[v0] Winning tiles reveal complete - hiding modal")
+    userDismissedModalRef.current = true
+    setShowWinningTiles(false)
+    setCanEndRoundAfterReveal(true)
+
+    if (playerResult) {
+      if (playerResult.won) {
+        toast.success(`You Won! ${playerResult.matches} Matches`, {
+          description: `+${playerResult.winAmount?.toFixed(4)} SUI will be sent to your wallet`,
+          duration: 6000,
+        })
+      } else {
+        toast.error(`No Win - ${playerResult.matches} Matches`, {
+          description: `You needed ${Math.ceil(winningTiles.length / 2)} matches to win`,
+          duration: 5000,
+        })
+      }
+    }
   }
 
   const handleEndRound = async () => {
-    console.log("[v0] End round clicked")
-
     if (!currentAccount) {
-      toast.error("Please connect your wallet first!")
+      toast.error("Please connect your wallet first")
       return
     }
 
@@ -324,40 +408,28 @@ export function GameBoard() {
       return
     }
 
-    if (!isRoundActive) {
-      toast.error("No active round to end.")
-      return
-    }
-
-    const currentTime = Date.now()
-    if (currentTime < roundEndTime) {
-      toast.error(`Round still active. ${Math.ceil((roundEndTime - currentTime) / 1000)}s remaining.`)
-      return
-    }
-
     setIsSubmitting(true)
-    console.log("[v0] Creating end round transaction...")
 
     try {
       const tx = createEndRoundTransaction(CONTRACT_CONFIG.GAME_STATE_ID)
-      console.log("[v0] Transaction created, signing...")
 
       signAndExecuteTransaction(
         {
           transaction: tx,
         },
         {
-          onSuccess: (result) => {
-            console.log("[v0] Round ended successfully:", result.digest)
-            toast.success("Game round ended! Results calculated.", {
-              description: `TX: ${result.digest.slice(0, 8)}...`,
-            })
-            setIsRoundActive(false)
-            setRoundEndTime(0)
+          onSuccess: () => {
+            toast.success("Round ended successfully!")
             setIsSubmitting(false)
+            setSubmittedTiles([])
+            checkRoundStatus()
+
+            if (autoRestart) {
+              setTimeout(() => handleStartRound(), 2000)
+            }
           },
           onError: (error) => {
-            console.error("End round error:", error)
+            console.error("[v0] End round error:", error)
             toast.error("Failed to end round", {
               description: error.message || "Please try again",
             })
@@ -365,160 +437,208 @@ export function GameBoard() {
           },
         },
       )
-    } catch (error: any) {
-      console.error("Error creating end round transaction:", error)
-      toast.error("Failed to create transaction", {
-        description: error.message || "Please try again",
-      })
+    } catch (error) {
+      console.error("[v0] End round error:", error)
+      toast.error("An error occurred. Please try again.")
       setIsSubmitting(false)
     }
   }
 
-  const canEndRound = () => {
-    if (!isRoundActive || !roundEndTime) return false
-    return Date.now() >= roundEndTime
-  }
-
   return (
-    <>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {!isCheckingRound && !isRoundActive && currentAccount && (
+    <div className="w-full mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {showWinningTiles && (
+            <WinningTilesReveal
+              winningTiles={winningTiles}
+              selectedTiles={submittedTiles}
+              onComplete={handleWinningTilesComplete}
+            />
+          )}
+
+          {!isCheckingRound && canShowEndRoundButton() && currentAccount && (
+            <Card className="border-orange-500/50 bg-orange-500/10">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <div>
+                    <p className="font-bold text-xl text-orange-700 dark:text-orange-300">Round Time Expired</p>
+                    <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
+                      This round needs to be ended before anyone can play again. Click below to end the round and reveal
+                      winning tiles.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleEndRound}
+                    disabled={isSubmitting}
+                    size="lg"
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    <Trophy className="mr-2 h-5 w-5" />
+                    {isSubmitting ? "Ending Round..." : "End Round & Reveal Winners"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isCheckingRound && !canShowEndRoundButton() && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center justify-between">
+                  <span>Select Your Numbers</span>
+                  {isRoundActive && roundEndTime > 0 && (
+                    <div className="flex items-center gap-2 text-sm font-normal">
+                      <Clock className="h-4 w-4" />
+                      <CountdownTimer endTime={roundEndTime} />
+                    </div>
+                  )}
+                </CardTitle>
+                <CardDescription>Choose your lucky tiles and place your bet</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <TileGrid
+                  selectedTiles={selectedTiles}
+                  onTileSelect={handleTileSelect}
+                  isPlaying={isRoundActive}
+                  winningTiles={showWinningTiles ? winningTiles : []}
+                />
+
+                {submittedTiles.length > 0 && (
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                      Your Tiles: {submittedTiles.join(", ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Bet: {betAmount.toFixed(2)} SUI | Waiting for round to end...
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <BetAmount
+                    betAmount={betAmount}
+                    onBetChange={setBetAmount}
+                    minBet={MIN_BET}
+                    disabled={true}
+                    selectedTiles={selectedTiles.length}
+                  />
+
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-6">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Selected Tiles:</span>
+                          <span className="font-bold">{selectedTiles.length}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Your Balance:</span>
+                          <span className="font-bold flex items-center gap-1">
+                            <Coins className="h-4 w-4 text-primary" />
+                            {balance.toFixed(2)} SUI
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Potential Win:</span>
+                          <span className="font-bold text-success">{(betAmount * 1.5).toFixed(2)} SUI</span>
+                        </div>
+                        <div className="flex justify-between text-sm pt-2 border-t">
+                          <span className="text-muted-foreground">Round Status:</span>
+                          <span className={`font-bold ${isRoundActive ? "text-green-600" : "text-yellow-600"}`}>
+                            {isCheckingRound ? "Checking..." : isRoundActive ? "Active" : "Not Started"}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleStartGame}
+                    size="lg"
+                    className="flex-1 text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    disabled={
+                      !isRoundActive ||
+                      selectedTiles.length === 0 ||
+                      betAmount < MIN_BET ||
+                      isSubmitting ||
+                      submittedTiles.length > 0
+                    }
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Start Game
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {!currentAccount && (
+                  <p className="text-center text-sm text-muted-foreground">Connect your wallet to start playing</p>
+                )}
+                {currentAccount && !isContractConfigured() && (
+                  <p className="text-center text-sm text-yellow-600 dark:text-yellow-400">
+                    Contract not configured. Please deploy and update environment variables.
+                  </p>
+                )}
+                {currentAccount && isContractConfigured() && !isRoundActive && !isCheckingRound && (
+                  <p className="text-center text-sm text-yellow-600 dark:text-yellow-400">
+                    No active round. Please start a round first using the admin panel above.
+                  </p>
+                )}
+
+                <p className="text-center text-xs text-muted-foreground/50">{APP_VERSION}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {!isCheckingRound && !isRoundActive && !canShowEndRoundButton() && shouldShowStartButton() && (
           <Card className="border-yellow-500/50 bg-yellow-500/10">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-yellow-700 dark:text-yellow-300">No Active Game Round</p>
-                  <p className="text-sm text-yellow-600 dark:text-yellow-400">Start a new round to begin playing</p>
-                </div>
-                <Button
-                  onClick={handleStartRound}
-                  disabled={isSubmitting}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white flex-shrink-0"
-                >
-                  <Zap className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Starting..." : "Start Round"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!isCheckingRound && isRoundActive && canEndRound() && currentAccount && (
-          <Card className="border-blue-500/50 bg-blue-500/10">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-blue-700 dark:text-blue-300">Round Time Expired</p>
-                  <p className="text-sm text-blue-600 dark:text-blue-400">End this round to start a new one</p>
-                </div>
-                <Button
-                  onClick={handleEndRound}
-                  disabled={isSubmitting}
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0"
-                >
-                  <StopCircle className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Ending..." : "End Round"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className="border-2 border-primary/20 shadow-lg">
-          <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <CardTitle className="text-2xl">Select Your Numbers</CardTitle>
-                <CardDescription>Choose your lucky tiles and place your bet</CardDescription>
-              </div>
-              <div className="flex-shrink-0">
-                <GameTimer timeRemaining={timeRemaining} isPlaying={isPlaying} />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <TileGrid selectedTiles={selectedTiles} onTileSelect={handleTileSelect} isPlaying={true} />
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <BetAmount betAmount={betAmount} onBetChange={setBetAmount} minBet={MIN_BET} disabled={isPlaying} />
-
-              <Card className="bg-muted/50">
-                <CardContent className="pt-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Selected Tiles:</span>
-                      <span className="font-bold">{selectedTiles.length}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Your Balance:</span>
-                      <span className="font-bold flex items-center gap-1">
-                        <Coins className="h-4 w-4 text-primary" />
-                        {balance.toFixed(2)} SUI
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Potential Win:</span>
-                      <span className="font-bold text-success">{(betAmount * 1.5).toFixed(2)} SUI</span>
-                    </div>
-                    <div className="flex justify-between text-sm pt-2 border-t">
-                      <span className="text-muted-foreground">Round Status:</span>
-                      <span className={`font-bold ${isRoundActive ? "text-green-600" : "text-yellow-600"}`}>
-                        {isCheckingRound ? "Checking..." : isRoundActive ? "Active" : "Not Started"}
-                      </span>
-                    </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-yellow-700 dark:text-yellow-300">No Active Game Round</p>
+                    <p className="text-sm text-yellow-600 dark:text-yellow-400">Start a new round to begin playing</p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <Button
+                    onClick={handleStartRound}
+                    disabled={isSubmitting}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white flex-shrink-0"
+                  >
+                    <Zap className="mr-2 h-4 w-4" />
+                    {isSubmitting ? "Starting..." : "Start Round"}
+                  </Button>
+                </div>
 
-            <div className="flex gap-3">
-              {!isPlaying ? (
-                <Button
-                  onClick={handleStartGame}
-                  size="lg"
-                  className="flex-1 text-lg font-bold bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-                  disabled={
-                    !currentAccount ||
-                    selectedTiles.length === 0 ||
-                    isSubmitting ||
-                    !isContractConfigured() ||
-                    !isRoundActive
-                  }
-                >
-                  <Play className="mr-2 h-5 w-5" />
-                  {isSubmitting ? "Processing..." : "Start Game"}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleReset}
-                  size="lg"
-                  variant="outline"
-                  className="flex-1 text-lg font-bold bg-transparent"
-                  disabled={gameStarted}
-                >
-                  <RotateCcw className="mr-2 h-5 w-5" />
-                  Reset
-                </Button>
-              )}
-            </div>
-
-            {!currentAccount && (
-              <p className="text-center text-sm text-muted-foreground">Connect your wallet to start playing</p>
-            )}
-            {currentAccount && !isContractConfigured() && (
-              <p className="text-center text-sm text-yellow-600 dark:text-yellow-400">
-                Contract not configured. Please deploy and update environment variables.
-              </p>
-            )}
-            {currentAccount && isContractConfigured() && !isRoundActive && !isCheckingRound && (
-              <p className="text-center text-sm text-yellow-600 dark:text-yellow-400">
-                Please start a round first using the button above
-              </p>
-            )}
-
-            <p className="text-center text-xs text-muted-foreground/50">{APP_VERSION}</p>
-          </CardContent>
-        </Card>
+                <div className="flex items-center justify-between pt-4 border-t border-yellow-500/30">
+                  <label htmlFor="auto-restart" className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                    Auto-Restart Rounds
+                  </label>
+                  <input
+                    id="auto-restart"
+                    type="checkbox"
+                    checked={autoRestart}
+                    onChange={(e) => setAutoRestart(e.target.checked)}
+                    className="h-4 w-4 rounded border-yellow-500/50"
+                  />
+                </div>
+                {autoRestart && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    New rounds will start automatically after the previous round ends
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <LuckyBoxModal
@@ -529,6 +649,6 @@ export function GameBoard() {
           setShowLuckyBox(false)
         }}
       />
-    </>
+    </div>
   )
 }
