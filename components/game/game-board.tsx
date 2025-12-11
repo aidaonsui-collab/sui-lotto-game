@@ -6,7 +6,6 @@ import { useCurrentAccount } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TileGrid } from "./tile-grid"
-import { BetAmount } from "./bet-amount"
 import { LuckyBoxModal } from "./lucky-box-modal"
 import { WinningTilesReveal } from "./winning-tiles-reveal"
 import { toast } from "sonner"
@@ -18,12 +17,21 @@ import {
 } from "@/lib/sui-transactions"
 import { CONTRACT_CONFIG, mistToSui, isContractConfigured } from "@/lib/contract-config"
 import { CountdownTimer } from "./countdown-timer" // Added import for CountdownTimer
+import { BetAmountWrapper } from "./bet-amount-wrapper"
 
 const GAME_DURATION = 60
 const MIN_BET = 0.05
 const BET_PER_TILE = 0.05
 const APP_VERSION = "v3.4.0-winning-tiles-reveal"
 const REVEAL_DURATION = 5000 // 5 seconds
+
+type BetAmountComponentProps = {
+  betAmount: number
+  onBetChange: (amount: number) => void
+  minBet: number
+  disabled?: boolean
+  selectedTiles: number
+}
 
 export function GameBoard() {
   const currentAccount = useCurrentAccount()
@@ -515,7 +523,7 @@ export function GameBoard() {
                 )}
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <BetAmount
+                  <BetAmountWrapper
                     betAmount={betAmount}
                     onBetChange={setBetAmount}
                     minBet={MIN_BET}
