@@ -30,7 +30,6 @@ type BetAmountComponentProps = {
   onBetChange: (amount: number) => void
   minBet: number
   disabled?: boolean
-  selectedTiles: number
 }
 
 export function GameBoard() {
@@ -523,13 +522,7 @@ export function GameBoard() {
                 )}
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <BetAmount
-                    betAmount={betAmount}
-                    onBetChange={setBetAmount}
-                    minBet={MIN_BET}
-                    disabled={true}
-                    selectedTiles={selectedTiles.length}
-                  />
+                  <BetAmount betAmount={betAmount} onBetChange={setBetAmount} minBet={MIN_BET} disabled={true} />
 
                   <Card className="bg-muted/50">
                     <CardContent className="pt-6">
