@@ -3,7 +3,7 @@
 import { Coins } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
-interface BetAmountProps {
+export interface BetAmountProps {
   betAmount: number
   onBetChange: (amount: number) => void
   minBet: number
