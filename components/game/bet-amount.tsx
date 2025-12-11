@@ -1,61 +1,60 @@
 "use client"
 
-import { Minus, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Coins } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 
 interface BetAmountProps {
   betAmount: number
   onBetChange: (amount: number) => void
   minBet: number
   disabled?: boolean
+  selectedTiles: number // Added selectedTiles prop to show tile count
 }
 
-export function BetAmount({ betAmount, onBetChange, minBet, disabled }: BetAmountProps) {
-  const handleIncrement = () => {
-    onBetChange(betAmount + 0.05)
-  }
-
-  const handleDecrement = () => {
-    if (betAmount > minBet) {
-      onBetChange(Math.max(minBet, betAmount - 0.05))
-    }
-  }
+export function BetAmount({ betAmount, onBetChange, minBet, disabled, selectedTiles }: BetAmountProps) {
+  const costPerTile = 0.05
+  const totalCost = selectedTiles * costPerTile
 
   return (
-    <Card className="bg-muted/50">
+    <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-2 border-primary/20">
       <CardContent className="pt-6">
-        <Label htmlFor="bet-amount" className="text-sm font-medium">
-          Bet Amount (SUI)
-        </Label>
-        <div className="flex items-center gap-2 mt-2">
-          <Button size="icon" variant="outline" onClick={handleDecrement} disabled={disabled || betAmount <= minBet}>
-            <Minus className="h-4 w-4" />
-          </Button>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Coins className="h-4 w-4 text-primary" />
+            Total Bet Amount
+          </div>
 
-          <Input
-            id="bet-amount"
-            type="number"
-            value={betAmount.toFixed(2)}
-            onChange={(e) => {
-              const value = Number.parseFloat(e.target.value)
-              if (!isNaN(value) && value >= minBet) {
-                onBetChange(value)
-              }
-            }}
-            step="0.05"
-            min={minBet}
-            disabled={disabled}
-            className="text-center font-bold text-lg"
-          />
+          <div className="text-center">
+            <div className="text-4xl font-bold text-primary">{totalCost.toFixed(2)} SUI</div>
+          </div>
 
-          <Button size="icon" variant="outline" onClick={handleIncrement} disabled={disabled}>
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="space-y-2 pt-4 border-t border-primary/10">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Cost per tile:</span>
+              <span className="font-semibold">{costPerTile.toFixed(2)} SUI</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Tiles selected:</span>
+              <span className="font-semibold">{selectedTiles}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold pt-2 border-t">
+              <span className="text-foreground">Total cost:</span>
+              <span className="text-primary">{totalCost.toFixed(2)} SUI</span>
+            </div>
+          </div>
+
+          {selectedTiles === 0 && (
+            <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
+              Select tiles to see total cost
+            </p>
+          )}
+          {selectedTiles > 0 && (
+            <p className="text-xs text-center text-muted-foreground">
+              {costPerTile.toFixed(2)} SUI × {selectedTiles} tile{selectedTiles > 1 ? "s" : ""} = {totalCost.toFixed(2)}{" "}
+              SUI
+            </p>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">Minimum bet: {minBet} SUI</p>
       </CardContent>
     </Card>
   )
