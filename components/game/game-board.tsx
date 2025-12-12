@@ -29,7 +29,8 @@ type BetAmountComponentProps = {
   betAmount: number
   onBetChange: (amount: number) => void
   minBet: number
-  disabled?: boolean
+  tileCount: number
+  costPerTile: number
 }
 
 export function GameBoard() {
@@ -57,6 +58,7 @@ export function GameBoard() {
   const userDismissedModalRef = useRef(false)
   const lastRevealedRoundRef = useRef<number>(0)
   const [autoRestart, setAutoRestart] = useState(false)
+  const [submittedBetAmount, setSubmittedBetAmount] = useState(0)
 
   const checkRoundStatus = async () => {
     if (!isContractConfigured()) {
@@ -96,6 +98,12 @@ export function GameBoard() {
             setWinningTiles(winningNumbers)
 
             if (submittedTiles.length > 0) {
+              console.log(
+                "[v0] Calculating matches - submittedTiles:",
+                submittedTiles,
+                "winningNumbers:",
+                winningNumbers,
+              )
               const matches = submittedTiles.filter((tile) => winningNumbers.includes(tile)).length
               const requiredMatches = Math.ceil(winningNumbers.length / 2)
               const won = matches >= requiredMatches
@@ -103,9 +111,18 @@ export function GameBoard() {
               setPlayerResult({
                 won,
                 matches,
-                winAmount: won ? betAmount * 1.5 : undefined,
+                winAmount: won ? submittedBetAmount * 1.5 : undefined,
               })
-              console.log("[v0] Player result:", { won, matches, requiredMatches, submittedTiles, winningNumbers })
+              console.log("[v0] Player result:", {
+                won,
+                matches,
+                requiredMatches,
+                submittedTiles,
+                winningNumbers,
+                submittedBetAmount,
+              })
+            } else {
+              console.log("[v0] No submittedTiles found - player may not have played this round")
             }
 
             setShowWinningTiles(true)
@@ -283,7 +300,10 @@ export function GameBoard() {
     setIsSubmitting(true)
 
     try {
-      const tx = createPlayGameTransaction(CONTRACT_CONFIG.GAME_STATE_ID, betAmount, selectedTiles)
+      const currentBetAmount = selectedTiles.length * BET_PER_TILE
+      console.log("[v0] Storing bet amount for this submission:", currentBetAmount)
+
+      const tx = createPlayGameTransaction(CONTRACT_CONFIG.GAME_STATE_ID, currentBetAmount, selectedTiles)
 
       signAndExecuteTransaction(
         {
@@ -295,6 +315,7 @@ export function GameBoard() {
               description: "Your tiles have been submitted. Good luck!",
             })
             setSubmittedTiles([...selectedTiles])
+            setSubmittedBetAmount(currentBetAmount)
             setSelectedTiles([])
             setIsSubmitting(false)
           },
@@ -429,6 +450,7 @@ export function GameBoard() {
             toast.success("Round ended successfully!")
             setIsSubmitting(false)
             setSubmittedTiles([])
+            setSubmittedBetAmount(0)
             checkRoundStatus()
 
             if (autoRestart) {
@@ -516,13 +538,18 @@ export function GameBoard() {
                       Your Tiles: {submittedTiles.join(", ")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Bet: {betAmount.toFixed(2)} SUI | Waiting for round to end...
+                      Bet: {submittedBetAmount.toFixed(2)} SUI | Waiting for round to end...
                     </p>
                   </div>
                 )}
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <BetAmount betAmount={betAmount} onBetChange={setBetAmount} minBet={MIN_BET} disabled={true} />
+                  <BetAmount
+                    betAmount={betAmount}
+                    minBet={MIN_BET}
+                    tileCount={selectedTiles.length}
+                    costPerTile={BET_PER_TILE}
+                  />
 
                   <Card className="bg-muted/50">
                     <CardContent className="pt-6">

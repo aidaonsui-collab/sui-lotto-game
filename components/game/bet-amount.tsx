@@ -5,17 +5,15 @@ import { Card, CardContent } from "@/components/ui/card"
 
 export function BetAmount({
   betAmount,
-  onBetChange,
   minBet,
-  disabled = false,
+  tileCount,
+  costPerTile,
 }: {
   betAmount: number
-  onBetChange: (amount: number) => void
   minBet: number
-  disabled?: boolean
+  tileCount: number
+  costPerTile: number
 }) {
-  const costPerTile = 0.05
-
   return (
     <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-2 border-primary/20">
       <CardContent className="pt-6">
@@ -34,14 +32,24 @@ export function BetAmount({
               <span className="text-muted-foreground">Cost per tile:</span>
               <span className="font-semibold">{costPerTile.toFixed(2)} SUI</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Tiles selected:</span>
+              <span className="font-semibold">{tileCount}</span>
+            </div>
             <div className="flex justify-between text-sm font-bold pt-2 border-t">
               <span className="text-foreground">Your bet:</span>
               <span className="text-primary">{betAmount.toFixed(2)} SUI</span>
             </div>
           </div>
+
+          {/* Show helpful message about how betting works */}
+          <p className="text-xs text-center text-muted-foreground pt-2 border-t">
+            {tileCount === 0
+              ? `Select tiles to place bet (${costPerTile.toFixed(2)} SUI each)`
+              : `${costPerTile.toFixed(2)} SUI × ${tileCount} tile${tileCount > 1 ? "s" : ""} = ${betAmount.toFixed(2)} SUI`}
+          </p>
         </div>
       </CardContent>
     </Card>
   )
 }
-// Build timestamp: 2025-12-11 04:28:43
